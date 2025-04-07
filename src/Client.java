@@ -12,34 +12,35 @@ import javax.crypto.SealedObject;
  */
 class Client {
     public static void main(String[] args) throws Exception {
+        // Step 1: Connect to the server
         Socket socket = new Socket("localhost", 5050);
         System.out.println("Client attempting to connect to localhost:5050...");
         System.out.println("Connected to server.");
 
-        // Setup input and output streams
+        // Step 2: Setup input and output streams for communication
         ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
         ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
 
-        // Receive Server's public key
+        // Step 3: Receive the server's public key for Diffie-Hellman key exchange
         PublicKey serverPublicKey = (PublicKey) input.readObject();
 
-        // Generate Client's DH key pair
+        // Step 4: Generate the client's Diffie-Hellman key pair
         KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance("DH");
         keyPairGen.initialize(((DHPublicKey) serverPublicKey).getParams());
         KeyPair keyPair = keyPairGen.generateKeyPair();
 
-        // Send Client's public key to Server
+        // Step 5: Send the client's public key to the server
         output.writeObject(keyPair.getPublic());
         output.flush();
 
-        // Generate shared secret key
+        // Step 6: Generate the shared secret key using the server's public key
         KeyAgreement keyAgreement = KeyAgreement.getInstance("DH");
         keyAgreement.init(keyPair.getPrivate());
         keyAgreement.doPhase(serverPublicKey, true);
         byte[] sharedSecret = keyAgreement.generateSecret();
         SecretKey secretKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
 
-        // Authenticate the server
+        // Step 7: Authenticate the server
         String serverChallenge = (String) input.readObject(); // Receive challenge from server
         String serverResponse = CryptoUtils.hash(serverChallenge + "clientSecret"); // Hash with client secret
         output.writeObject(serverResponse); // Send response to server
@@ -52,7 +53,7 @@ class Client {
         }
         System.out.println("Server authenticated.");
 
-        // Authenticate the client
+        // Step 8: Authenticate the client
         String clientChallenge = "clientChallenge123"; // Client's challenge
         output.writeObject(clientChallenge); // Send challenge to server
         output.flush();
@@ -69,19 +70,20 @@ class Client {
 
         System.out.println("Shared secret key established.");
 
-        // Create SecureData object
+        // Step 9: Create an object of SecureData to send to the server
         SecureData data = new SecureData("Alice", "Confidential Message", 123.45);
         System.out.println("Original Data: " + data);
 
-        // Encrypt SecureData object using SealedObject
+        // Step 10: Encrypt the SecureData object using SealedObject
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.ENCRYPT_MODE, secretKey);
         SealedObject sealedObject = new SealedObject(data, cipher);
 
-        // Send SealedObject
+        // Step 11: Send the encrypted object to the server
         output.writeObject(sealedObject);
         output.flush();
 
+        // Step 12: Close the connection
         socket.close();
     }
 }
