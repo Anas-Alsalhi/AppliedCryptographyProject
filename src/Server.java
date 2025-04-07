@@ -3,6 +3,7 @@ import javax.crypto.spec.*;
 import java.io.*;
 import java.net.*;
 import java.security.*;
+import javax.crypto.SealedObject;
 
 /**
  * Server class that handles the Diffie-Hellman key exchange, receives encrypted data, and decrypts it.
@@ -72,14 +73,13 @@ class Server {
         }
         System.out.println("Server authenticated.");
 
-        // Receive encrypted data
-        byte[] encryptedData = (byte[]) input.readObject();
-        byte[] decryptedData = CryptoUtils.decrypt(encryptedData, secretKey);
+        // Receive SealedObject
+        SealedObject sealedObject = (SealedObject) input.readObject();
 
-        // Deserialize object
-        ByteArrayInputStream bis = new ByteArrayInputStream(decryptedData);
-        ObjectInputStream ois = new ObjectInputStream(bis);
-        SecureData receivedData = (SecureData) ois.readObject();
+        // Decrypt SealedObject
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.DECRYPT_MODE, secretKey);
+        SecureData receivedData = (SecureData) sealedObject.getObject(cipher);
 
         System.out.println("Received decrypted data: " + receivedData);
 
