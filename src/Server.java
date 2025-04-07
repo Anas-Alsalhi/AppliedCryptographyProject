@@ -11,6 +11,7 @@ class Server {
     public static void main(String[] args) throws Exception {
         ServerSocket serverSocket = new ServerSocket(5050);
         System.out.println("Server started. Waiting for client...");
+        System.out.println("Server is listening on port 5050...");
 
         // Accept client connection
         Socket clientSocket = serverSocket.accept();
@@ -40,6 +41,36 @@ class Server {
         SecretKey secretKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
 
         System.out.println("Shared secret key established.");
+
+        // Authenticate the client
+        String clientChallenge = "serverChallenge123"; // Server's challenge
+        output.writeObject(clientChallenge); // Send challenge to client
+        output.flush();
+        String clientResponse = (String) input.readObject(); // Receive client's response
+        boolean clientAuthenticated = CryptoUtils.hash(clientChallenge + "clientSecret").equals(clientResponse);
+        output.writeObject(clientAuthenticated); // Send authentication result to client
+        output.flush();
+        if (!clientAuthenticated) {
+            System.out.println("Client authentication failed.");
+            clientSocket.close();
+            serverSocket.close();
+            return;
+        }
+        System.out.println("Client authenticated.");
+
+        // Authenticate the server
+        String serverChallenge = (String) input.readObject(); // Receive challenge from client
+        String serverResponse = CryptoUtils.hash(serverChallenge + "serverSecret"); // Hash with server secret
+        output.writeObject(serverResponse); // Send response to client
+        output.flush();
+        boolean serverAuthenticated = (boolean) input.readObject(); // Receive client authentication result
+        if (!serverAuthenticated) {
+            System.out.println("Server authentication failed.");
+            clientSocket.close();
+            serverSocket.close();
+            return;
+        }
+        System.out.println("Server authenticated.");
 
         // Receive encrypted data
         byte[] encryptedData = (byte[]) input.readObject();

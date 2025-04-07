@@ -12,6 +12,7 @@ import java.security.*;
 class Client {
     public static void main(String[] args) throws Exception {
         Socket socket = new Socket("localhost", 5050);
+        System.out.println("Client attempting to connect to localhost:5050...");
         System.out.println("Connected to server.");
 
         // Setup input and output streams
@@ -29,6 +30,34 @@ class Client {
         // Send Client's public key to Server
         output.writeObject(keyPair.getPublic());
         output.flush();
+
+        // Authenticate the server
+        String serverChallenge = (String) input.readObject(); // Receive challenge from server
+        String serverResponse = CryptoUtils.hash(serverChallenge + "clientSecret"); // Hash with client secret
+        output.writeObject(serverResponse); // Send response to server
+        output.flush();
+        boolean serverAuthenticated = (boolean) input.readObject(); // Receive server authentication result
+        if (!serverAuthenticated) {
+            System.out.println("Server authentication failed.");
+            socket.close();
+            return;
+        }
+        System.out.println("Server authenticated.");
+
+        // Authenticate the client
+        String clientChallenge = "clientChallenge123"; // Client's challenge
+        output.writeObject(clientChallenge); // Send challenge to server
+        output.flush();
+        String clientResponse = (String) input.readObject(); // Receive server's response
+        boolean clientAuthenticated = CryptoUtils.hash(clientChallenge + "serverSecret").equals(clientResponse);
+        output.writeObject(clientAuthenticated); // Send authentication result to server
+        output.flush();
+        if (!clientAuthenticated) {
+            System.out.println("Client authentication failed.");
+            socket.close();
+            return;
+        }
+        System.out.println("Client authenticated.");
 
         // Generate shared secret key
         KeyAgreement keyAgreement = KeyAgreement.getInstance("DH");
